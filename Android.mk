@@ -25,7 +25,7 @@ ifneq ($(filter foster,$(TARGET_DEVICE)),)
 LOCAL_CFLAGS += -DENABLE_SATA_STANDBY_MODE
 endif
 
-# Any devices with a Tegra 4 or older GPU
+# Any devices with a old interactive governor
 ifneq ($(filter roth,$(TARGET_DEVICE)),)
     LOCAL_CFLAGS += -DPOWER_MODE_LEGACY
 endif
