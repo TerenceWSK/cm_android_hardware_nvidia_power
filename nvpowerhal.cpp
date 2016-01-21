@@ -29,13 +29,14 @@ static void set_interactive_governor(int mode);
 static const interactive_data_t interactive_data_array[] =
 {
     { "1122000", "65 304000:75 1122000:80", "19000", "20000", "0", "41000", "90" },
-    { "1020000", "65 256000:75 1020000:80", "41000", "20000", "0", "30000", "99" },
+    { "1020000", "65 256000:75 1020000:80", "19000", "20000", "0", "30000", "99" },
     { "640000", "65 256000:75 640000:80", "80000", "20000", "2", "30000", "99" },
-    { "1020000", "65 256000:75 1020000:80", "41000", "20000", "0", "30000", "99" },
+    { "1020002", "65 256000:75 1020000:80", "19000", "20000", "0", "30000", "99" },
     { "420000", "80",                     "80000", "300000","2", "30000", "99" }
 };
 #endif
 
+static const int VSyncActiveBoostFreq = 300000;
 static int uC_input_number = 1;
 
 /*static void set_led_state(int on)
@@ -268,6 +269,21 @@ void common_power_open(struct powerhal_info *pInfo)
     free(buf);
 }
 
+static void set_vsync_min_cpu_freq(struct powerhal_info *pInfo, int enabled)
+{
+    static int vsync_min_cpu = -1;
+
+    if (enabled && vsync_min_cpu == -1) {
+        vsync_min_cpu =
+        pInfo->mTimeoutPoker->requestPmQos(PMQOS_CONSTRAINT_CPU_FREQ, PM_QOS_BOOST_PRIORITY, PM_QOS_DEFAULT_VALUE, VSyncActiveBoostFreq);
+    } else if (!enabled && vsync_min_cpu >= 0) {
+        close(vsync_min_cpu);
+        vsync_min_cpu = -1;
+    }
+
+    ALOGV("%s: set min CPU floor =%i", __func__, VSyncActiveBoostFreq);
+}
+
 static void set_fan_cap(struct powerhal_info *pInfo, int value)
 {
     if (!pInfo->features.fan)
@@ -308,6 +324,7 @@ void common_power_set_interactive(__attribute__ ((unused)) struct power_module *
     int dev_id;
     char path[80];
     const char* state = (0 == on)?"0":"1";
+    int power_mode = -1;
 
     sysfs_write("/sys/devices/platform/host1x/nvavp/boost_sclk", state);
 
@@ -435,6 +452,8 @@ void common_power_hint(__attribute__ ((unused)) struct power_module *module, str
 
     switch (hint) {
     case POWER_HINT_VSYNC:
+        if (data)
+            set_vsync_min_cpu_freq(pInfo, *(int *)data);
         break;
     case POWER_HINT_INTERACTION:
         if (pInfo->ftrace_enable) {
@@ -462,7 +481,7 @@ void common_power_hint(__attribute__ ((unused)) struct power_module *module, str
         pInfo->mTimeoutPoker->requestPmQosTimed(PMQOS_CONSTRAINT_GPU_FREQ,
                                                 PM_QOS_BOOST_PRIORITY,
                                                 PM_QOS_DEFAULT_VALUE,
-                                                180000,
+                                                540000,
                                                 s2ns(2));
         pInfo->mTimeoutPoker->requestPmQosTimed("/dev/emc_freq_min",
                                                  396000,
